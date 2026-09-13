@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  REGISTRAR
+  ADVISER
+}
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+enum EnrollmentStatus {
+  PENDING
+  DOCUMENTS_SUBMITTED
+  VERIFIED
+  SECTION_ASSIGNED
+  ENROLLED
+  ACTIVE
+}
+
+enum RequirementType {
+  FORM_9
+  PSA_BIRTH_CERT
+  ID_PHOTO
+  GOOD_MORAL
+  OTHER
+}
+
+enum RequirementStatus {
+  PENDING
+  SUBMITTED
+  VERIFIED
+  REJECTED
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String
+  role      UserRole  @default(REGISTRAR)
+  password  String
+  sections  Section[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Student {
+  id          String       @id @default(cuid())
+  lrn         String?      @unique
+  firstName   String
+  lastName    String
+  birthDate   DateTime
+  sex         Sex
+  guardians   Guardian[]
+  enrollments Enrollment[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Guardian {
+  id           String   @id @default(cuid())
+  studentId    String
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  name         String
+  relationship String
+  contact      String
+  createdAt    DateTime @default(now())
+
+  @@index([studentId])
+}
+
+model SchoolYear {
+  id          String       @id @default(cuid())
+  label       String       @unique // e.g. "2026-2027"
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean      @default(false)
+  enrollments Enrollment[]
+  createdAt   DateTime     @default(now())
+}
+
+model Section {
+  id          String       @id @default(cuid())
+  adviserId   String?
+  adviser     User?        @relation(fields: [adviserId], references: [id])
+  gradeLevel  String // "Grade 7" ... "Grade 12"
+  name        String // e.g. "Rizal", "STEM-A"
+  track       String? // SHS track/strand, null for JHS
+  capacity    Int          @default(40)
+  enrollments Enrollment[]
+  createdAt   DateTime     @default(now())
+
+  @@unique([gradeLevel, name, track])
+  @@index([adviserId])
+}
+
+model Enrollment {
+  id           String           @id @default(cuid())
+  studentId    String
+  student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  schoolYearId String
+  schoolYear   SchoolYear       @relation(fields: [schoolYearId], references: [id])
+  sectionId    String?
+  section      Section?         @relation(fields: [sectionId], references: [id])
+  status       EnrollmentStatus @default(PENDING)
+  requirements Requirement[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([studentId, schoolYearId])
+  @@index([schoolYearId])
+  @@index([sectionId])
+  @@index([status])
+}
+
+model Requirement {
+  id           String            @id @default(cuid())
+  enrollmentId String
+  enrollment   Enrollment        @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  type         RequirementType
+  fileUrl      String?
+  status       RequirementStatus @default(PENDING)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([enrollmentId, type])
+  @@index([enrollmentId])
+}
